@@ -70,7 +70,22 @@ If yes:
 4. Default JIRA project key (free-text):
    - `Default JIRA project key for new tickets (e.g. PROJ; default: <existing or none>):`
 
-### Step 5: Preview before writing
+### Step 5: Review framework
+
+Use AskUserQuestion (single-select):
+- Question: `Review framework for /brain:log-review and /brain:draft-review?`
+- Options:
+  - `Generic — outcome / quantification / evidence`
+  - `LinkedIn — Impact / Leadership / Execution / Craft buckets`
+  - `Custom — placeholder for org-specific framework`
+  - `Skip — set later`
+
+Map the picked label to its lowercase config value when writing `brain.config.yaml`: `Generic` → `generic`, `LinkedIn` → `linkedin`, `Custom` → `custom`. `Skip` → omit the `review:` block entirely.
+
+Then if not skipped:
+- `Current review period (e.g. fy26-h1; default: <existing or "fy26-h1">):` — free-text.
+
+### Step 6: Preview before writing
 
 Show the assembled config and confirm via AskUserQuestion:
 
@@ -91,6 +106,9 @@ About to write brain.config.yaml:
     default_project_key:  <PROJ>
   github:
     default_org:    <github-org>
+  review:
+    framework:      <framework>
+    current_period: <period>
 ```
 
 - Question: `Save this config?`
@@ -99,7 +117,7 @@ About to write brain.config.yaml:
   - `No, restart` (loop back to Step 2)
   - `Cancel`
 
-### Step 6: Write to disk (atomic batch)
+### Step 7: Write to disk (atomic batch)
 
 On confirm:
 
@@ -113,7 +131,7 @@ On confirm:
    ```
    If it fails (e.g., `~/.claude/commands/brain` exists as a non-symlink), surface the error verbatim and stop — don't try to clobber.
 
-### Step 7: Smoke check
+### Step 8: Smoke check
 
 Verify each integration is reachable in this session:
 
@@ -121,7 +139,7 @@ Verify each integration is reachable in this session:
 - **Atlassian MCP:** if Step 4 succeeded, run a tiny sanity query (e.g., `searchJiraIssuesUsingJql` with `assignee = <accountId> AND statusCategory != Done` limit 1). Print `Atlassian: ✓ (sample query returned <N> ticket(s))`. On error, print `Atlassian: ⚠ <error>` but don't block setup completion.
 - **Brain commands:** confirm `~/.claude/commands/brain` is a symlink. Print `Commands: ✓ — 12 commands available as /brain:*`.
 
-### Step 8: Final output
+### Step 9: Final output
 
 ```
 Setup complete.

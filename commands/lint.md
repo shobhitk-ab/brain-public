@@ -18,7 +18,7 @@ Load `$BRAIN/brain.config.yaml`. If missing, stop with: `brain.config.yaml not f
 
 **Active projects** = `ls $BRAIN/wiki/projects/` minus `_template/` and dotfile entries. If empty, output: `No active projects yet — nothing to lint. Run /brain:track first.` and stop.
 
-**Current review period:** detect by newest file matching `wiki/reviews/fy*-h*.md` (e.g. `fy26-h1.md`). If no review file exists, skip Step 2.7.
+**Current review period:** `review.current_period` from config (e.g. `fy26-h1`).
 
 ### Step 2: Run all checks (parallel where possible)
 
@@ -51,10 +51,13 @@ Read `$BRAIN/wiki/decisions/*.md` and `$BRAIN/wiki/projects/*/decisions/*.md`. C
 Grep `$BRAIN/lessons/mistakes.md` for headings with overlapping keyword sets → flag possible duplicates to merge.
 
 #### 2.7 — Review file health
-Current period file: detected newest `wiki/reviews/fy*-h*.md`.
-- Count entries per bucket: `Impact`, `Leadership`, `Execution`, `Craft`.
+Current period file: `$BRAIN/wiki/reviews/<review.current_period>.md`.
+- Count entries per bucket. Buckets depend on `review.framework`:
+  - `linkedin` → Impact / Leadership / Execution / Craft
+  - `generic` → outcome-style entries; just count totals
+  - `custom` → user-customized buckets if present
 - Count days into the period (estimate from period name).
-- If Impact has <5 entries and the period is >1 month in → flag thin.
+- If Impact / outcome-equivalent has <5 entries and the period is >1 month in → flag thin.
 - Entries missing quantification (no numbers, no `%`, no `$`, no time-saved figure) → list them as candidates to revise via `/brain:log-review`.
 
 #### 2.8 — Ingestion cadence
@@ -104,8 +107,8 @@ ORPHANS:
   - <N> decisions not linked from any _state.md
 
 REVIEW HEALTH (<period>):
-  Impact: N · Leadership: N · Execution: N · Craft: N
-  Impact is thin (<N> after <M> months)
+  Buckets: <bucket>: N · <bucket>: N · ...
+  <bucket> is thin (<N> after <M> months)
   <N> entries missing quantification
 
 INGESTION:
