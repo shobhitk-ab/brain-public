@@ -38,7 +38,7 @@ Build the **active project list:** `ls $BRAIN/wiki/projects/` minus `_template/`
 ### Step 3: Read in this order
 
 1. **`$BRAIN/CLAUDE.md`** — orchestration rules. Absorb them.
-2. **`$BRAIN/brain.config.yaml`** — user identity + integration config. Hold these in working memory: `user.name`, `user.role`, `user.team`, `user.github_handle`, `jira.cloud_id`, `jira.account_id`, `jira.default_project_key`, `github.default_org`. Other commands rely on these in this session.
+2. **`$BRAIN/brain.config.yaml`** — user identity + integration config. Hold these in working memory: `user.name`, `user.role`, `user.team`, `user.github_handle`, `jira.cloud_id`, `jira.account_id`, `jira.default_project_key`, `github.default_org`, `review.framework`, `review.current_period`. Other commands rely on these in this session.
 3. **All of `$BRAIN/lessons/*.md`** — mistakes, preferences, patterns, gotchas. These are durable memory.
 4. **`$BRAIN/wiki/now.md`** — today's priorities. If the file header says STALE, flag that in output.
 5. **`$BRAIN/wiki/projects/index.md`** — one-line status per project.

@@ -202,6 +202,18 @@ To pull upstream improvements: `git pull` brings new command logic without touch
 
 ---
 
+## Customizing for your org
+
+Most customization happens via `brain.config.yaml` (`/brain:setup` writes it). For deeper org-specific behavior:
+
+- **Review framework:** pick `linkedin | generic | custom` in setup. Drives bucket structure in `/brain:log-review`, `/brain:compress`, `/brain:draft-review`.
+- **JIRA project keys:** `jira.default_project_key` is the default for `/brain:track`-created tickets. Per-project epics live in matcher files.
+- **GitHub default org:** `github.default_org` informs PR filtering.
+
+If you need to add a new framework or change how matchers work, the commands are plain markdown — edit them in `commands/` and your fork carries the change.
+
+---
+
 ## License
 
 MIT. Fork and fill in your own brain.

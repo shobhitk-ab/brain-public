@@ -10,9 +10,15 @@ Run before `/compact` or closing a session. Saves a searchable log, proposes rev
 
 ## Instructions for Claude
 
-### Step 1: Detect brain
+### Step 1: Detect brain, load config
 
 Use `$BRAIN_DIR` env var or default `~/brain`. Confirm `$BRAIN/CLAUDE.md` exists. If not, stop with: `No brain at <path>.`
+
+Load `$BRAIN/brain.config.yaml`. Required keys for this command:
+- `review.framework` (`linkedin | generic | custom`) — drives review-entry classification in Step 3.
+- `review.current_period` (e.g. `fy26-h1`) — drives the review file path in Step 7.
+
+If config is missing or these keys are absent, run Steps 2–6 and 8 normally but **skip review-entry proposals** in Step 3 and the review file append in Step 7. Tell the user: `Review framework not configured — run /brain:setup to enable review-entry proposals.`
 
 ### Step 2: Ask what to preserve
 
@@ -33,21 +39,31 @@ Use AskUserQuestion (multi-select):
 
 Scan the session. **Only flag an entry if it has an external artifact** (PR, JIRA ticket, design doc, meeting, decision). This filter is load-bearing — skip anything without an artifact.
 
-For each candidate, classify into one of: `Impact | Leadership | Execution | Craft`.
+Classification depends on `review.framework`:
+
+- **`linkedin`:** classify each candidate into `Impact | Leadership | Execution | Craft`. Show the bucket in the proposal so the user can correct it.
+- **`generic` or `custom`:** no bucket classification — entries land flat under `## Entries`. Just propose the outcome + artifact pair.
 
 Propose to user with AskUserQuestion (multi-select):
 
-- Question: `Approve review entries to append to the current review file?`
-- Options: one per candidate (with bucket label) plus a final option `None — skip review entries this run`.
+- Question: `Approve review entries to append to wiki/reviews/<review.current_period>.md?`
+- Options: one per candidate, formatted per framework. Plus a final option `None — skip review entries this run`.
 
-Show in the message body above the question:
+For `linkedin`, show buckets:
 ```
 [Execution]  Shipped X — PR#NNNN
 [Leadership] Drove alignment with team Y — meeting 2026-05-07
 [Impact]     Reduced Z by N% — dashboard link
 ```
 
-If none qualify, skip this step silently.
+For `generic`/`custom`, no buckets:
+```
+Shipped X — PR#NNNN
+Drove alignment with team Y — meeting 2026-05-07
+Reduced Z by N% — dashboard link
+```
+
+If none qualify, or `review.framework` is unset, skip this step silently.
 
 ### Step 4: Propose lessons (flagged, not auto-saved)
 
@@ -147,12 +163,14 @@ claude_session_id: <SESSION_ID or null>
 
 ### Step 7: Append approved review entries
 
-Target file: `$BRAIN/wiki/reviews/<period>.md` — detect current period by newest file matching `fy*-h*.md` (e.g., `fy26-h1.md`). If no review file exists, **don't create it here** — suggest running `/brain:log-review` once first. Skip Step 7's append in that case and report it as a non-fatal skip.
+Target file: `$BRAIN/wiki/reviews/<review.current_period>.md`. If the file doesn't exist, **don't create it from scratch here** — instead suggest the user run `/brain:log-review` once first (which creates the file with the right framework template). Skip Step 7's append in that case and report it as a non-fatal skip.
 
 If the file exists:
-- For each approved entry, append to the matching bucket section (`## Impact` / `## Leadership` / `## Execution` / `## Craft`).
-- Entry shape mirrors `/brain:log-review`'s shape (outcome — quantification — Before/After for Impact — Evidence: [link]).
-- Append the artifact to the matching `## Raw evidence pool` subsection (PR / JIRA / Doc / Meeting / Decision). Skip if already listed (idempotent).
+- For each approved entry, append to the matching section per framework:
+  - **`linkedin`:** append to the bucket section (`## Impact` / `## Leadership` / `## Execution` / `## Craft`).
+  - **`generic` / `custom`:** append to `## Entries`.
+- Entry shape mirrors `/brain:log-review`'s shape (outcome — quantification — Before/After if Impact under linkedin — Evidence: [link]).
+- Append the artifact to the matching `## Raw evidence pool` subsection (PR / JIRA / Doc / Meeting / Decision). Skip if the artifact is already listed (idempotent).
 - Use Edit, not Write.
 
 ### Step 8: Update project `_state.md` if material progress was made
@@ -171,7 +189,7 @@ SAVED.
 
 Session log:  wiki/projects/<primary>/sessions/YYYY-MM-DD-HHMM-<slug>.md
               (or "skipped — no project tagged")
-Review entries appended: <count> (to wiki/reviews/<period>.md)
+Review entries appended: <count> (to wiki/reviews/<review.current_period>.md)
                         (or "skipped — review file not initialized; run /brain:log-review first")
 Project state updated: <list of project files touched, or "none">
 Potential lessons flagged: <count>  — run /brain:preserve to save any
