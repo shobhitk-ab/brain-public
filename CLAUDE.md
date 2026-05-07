@@ -2,8 +2,8 @@
 
 This is a personal knowledge repo. Everything you work on flows in here; Claude maintains it; it remembers things across sessions so mistakes don't repeat and reviews don't require reconstruction.
 
-**Owner:** you — fill in your name, role, and context here.
-**Active products:** list your main projects here (e.g. project-a, project-b).
+**Owner & integrations:** see `brain.config.yaml` (gitignored). Loaded at session start by `/brain:resume`. If missing, run `/brain:setup` to (re)generate it.
+**Active products:** derived from `wiki/projects/` directory listing (excluding `_template/` and dotfiles) at runtime — single source of truth, no duplicate to maintain.
 **Today's date:** use the system date; convert all relative dates ("yesterday", "last week") to absolute `YYYY-MM-DD` when writing.
 
 ---
@@ -22,8 +22,10 @@ lessons/   durable rules — loaded into every session. This is what makes the b
 
 ```
 brain/
-├── CLAUDE.md                  # this file — orchestration rules
+├── CLAUDE.md                  # this file — orchestration rules (committed, generic)
 ├── README.md                  # setup and usage manual
+├── brain.config.yaml          # personal identity + integration config (GITIGNORED)
+├── install.sh                 # symlinks commands/ into ~/.claude/commands/brain
 ├── raw/
 │   ├── jira/                  # JIRA ticket snapshots (YYYY-MM-DD-KEY.md)
 │   ├── prs/                   # PR snapshots (YYYY-MM-DD-repo-NNNN.md)
@@ -86,25 +88,25 @@ If you skip this, the work is lost.
 
 ---
 
-## Project setup
+## Initial setup
 
-To add a new project:
+For a brand-new clone of this brain template, run `/brain:setup` once. It walks you through identity, GitHub auth, Atlassian MCP auth, JIRA defaults, and writes `brain.config.yaml`.
+
+## Adding a project
 
 ```bash
 cp -r wiki/projects/_template wiki/projects/<your-project>
+# edit wiki/projects/<your-project>/overview.md
+# add a line to wiki/projects/index.md
 ```
 
-Then edit `wiki/projects/<your-project>/overview.md` with the project context. Update `wiki/projects/index.md` with a one-line status.
-
-Also update this file (`CLAUDE.md`) to add your project name to the **Active products** line at the top — this is how Claude knows which projects to surface in morning briefings and session summaries.
+The active project list is read at runtime from `wiki/projects/`. No CLAUDE.md edit needed.
 
 ---
 
 ## JIRA integration
 
-`/brain:ingest-jira` requires a JIRA MCP tool. Options:
-- If you're at LinkedIn: Captain MCP is pre-configured (see the LinkedIn variant of this brain)
-- Otherwise: use any JIRA MCP integration and update `commands/ingest-jira.md` with your project key → brain-project mappings
+`/brain:ingest-jira` is wired to the **claude.ai Atlassian MCP** (`mcp__claude_ai_Atlassian__*`). Cloud ID, account ID, and default project key live in `brain.config.yaml`.
 
 If you don't have a JIRA MCP, skip this command. Use `/brain:capture` to paste JIRA content manually.
 
@@ -112,6 +114,4 @@ If you don't have a JIRA MCP, skip this command. Use `/brain:capture` to paste J
 
 ## PR integration
 
-`/brain:ingest-prs` uses the `gh` CLI. Run `gh auth login` if not already authenticated.
-
-Update the filter in `commands/ingest-prs.md` to include your actual repo names.
+`/brain:ingest-prs` uses the `gh` CLI. Run `gh auth login` if not already authenticated. The default org and your GitHub handle live in `brain.config.yaml`.
