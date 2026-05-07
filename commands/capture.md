@@ -1,83 +1,82 @@
 ---
-description: Quick-capture an idea, thought, or snippet into raw/inbox/ without a full conversation
-model: opus
-allowed-tools: Read, Write, Bash, AskUserQuestion
+description: Quick-capture an idea, thought, or snippet into raw/inbox/ — fast, no gate
+model: haiku
+allowed-tools: Write, Bash
 ---
 
 # /brain:capture — Fast dump into inbox
 
-For when you want something saved NOW and don't want a back-and-forth. The content can be anything: an idea, a link, a paragraph from an article, a thought you don't want to lose.
+Sticky-note dropzone. Save the content **first**, then show what you inferred. The user wanted speed.
 
 **Usage:**
 - `/brain:capture <content>` — save the content with a date-stamped filename
-- `/brain:capture` — prompt for content (useful if the thought is long or you haven't typed it yet)
+- `/brain:capture` — wait for the user's next message and save its full body
+
+## Core invariant
+
+**Never lose content.** If anything below is ambiguous, default to writing the file. The user can correct misclassification after; they cannot recover lost content.
 
 ## Instructions for Claude
 
-### Step 1: Get the content
+### Step 1: Resolve brain path and get content
 
-If `$ARGUMENTS` is non-empty, use it as the content.
-Otherwise, ask the user: "What are we capturing? (paste or type — hit done when finished)"
+Brain path: `$BRAIN_DIR` env var, or default `~/brain`. Confirm `$BRAIN/CLAUDE.md` exists (`test -f`). If not, stop with: `No brain at <path> — set BRAIN_DIR or run from a brain directory.`
 
-### Step 2: Suggest classification (fast, don't overdo it)
+Content:
+- If `$ARGUMENTS` is non-empty, that is the content — verbatim, including newlines and any special chars.
+- Otherwise, emit a single line — `What are we capturing? Paste or type your full thought; I'll save your next message verbatim.` — and stop. The user's next message is the content; resume from Step 2 on that turn.
 
-Glance at the content and guess:
-- **type:** `idea | note | link | snippet | followup | question`
-- **projects:** list any of project-a/project-b/project-c/project-d mentioned or implied, or `[]` if none
-- **topic slug:** 2–4 words, lowercase, hyphens
+### Step 2: Classify silently (no gate)
 
-Show the guess in one line:
-```
-I'll save this as: type=idea, projects=[project-a], slug=auto-precheck-retry
-  (reply to change, or press enter/say "ok" to accept)
-```
+Infer four fields without asking:
 
-Only ask for overrides if the user corrects. Don't gate on explicit approval for each field.
+- **type** — one of `note | link | followup`. Apply rules in this order, first match wins:
+  1. `link` — if the content contains a URL (http://, https://, or `www.`). URL presence beats any action-verb cues; "read this later" attached to a link is still a `link`.
+  2. `followup` — if no URL, but the content reads like an action item directed at a person or future-self ("ask X", "remember to Y", "ping Z about W", "follow up on …").
+  3. `note` — everything else. Default to `note` when in doubt.
+- **projects** — list of project slugs from `ls $BRAIN/wiki/projects/` excluding `_template/` and any dotfiles. Tag a project only if its slug, an obvious alias, or domain-specific term from that project's `overview.md` appears in the content. **Do not auto-tag a project just because it is the only one that exists** — `[]` is a perfectly valid answer and is the correct default. Multiple matches are fine.
+- **slug** — 2–4 words drawn from the content, lowercase, hyphenated, articles/prepositions dropped. If the content is too short or generic for a meaningful slug, use `quick-note`.
+- **title** — the first sentence of the content, truncated to 60 chars. If there is no sentence break in the first 60 chars, take the first 60 chars verbatim.
 
 ### Step 3: Write the file
 
-Filename: `$BRAIN/raw/inbox/YYYY-MM-DD-HHMM-<slug>.md`
+Filename: `$BRAIN/raw/inbox/YYYY-MM-DD-HHMMSS-<slug>.md`
+- Date and time: **system local time, 24-hour**.
+- `mkdir -p $BRAIN/raw/inbox/` if missing.
+
+File body:
 
 ```markdown
 ---
 type: <type>
 date: YYYY-MM-DD
-time: HH:MM
-projects: [<list>]
-captured_via: /brain:capture
+time: HH:MM:SS
+projects: [<flow-list>]
 status: unprocessed
 ---
 
-# <1-line title derived from content>
+# <title>
 
-<content verbatim — do not paraphrase>
-
----
-
-_Captured YYYY-MM-DD HH:MM. Will be processed on next /brain:lint or /brain:morning._
+<content verbatim — do not paraphrase or reformat>
 ```
 
-### Step 4: One-line confirmation
+YAML `projects:` must use the **flow-sequence** form, no quotes, no block-list:
+- `projects: []` (none)
+- `projects: [main]` (one)
+- `projects: [main, security]` (multiple, comma-space separated)
+
+### Step 4: One-line confirmation with inferred classification
 
 ```
-CAPTURED: raw/inbox/YYYY-MM-DD-HHMM-<slug>.md
+CAPTURED: raw/inbox/YYYY-MM-DD-HHMMSS-<slug>.md
+  Inferred: type=<type> · projects=[<list>] · slug=<slug>
+  (say so if any of that is wrong and I'll rename/retag.)
 ```
 
-Nothing more. The user wanted speed.
-
-### Step 5: (Only if content clearly matches an active project context)
-
-If the content obviously belongs in a project's _state.md "Next moves" or in a specific file, mention it as a single line after the confirmation:
-
-```
-CAPTURED: raw/inbox/2026-04-23-1440-auto-precheck-retry.md
-(Looks project-a-relevant — /brain:lint will propose moving it to project-a/_state.md Next moves.)
-```
-
-Don't move it yourself. `/brain:lint` handles inbox processing so you see the proposals batched.
+Nothing else. The file is already on disk before this message renders, so the user is free to walk away.
 
 ## Notes
 
-- Never lose content. If in doubt about type/slug, save with placeholder values — speed matters more than perfect classification.
-- Inbox is the firehose. `/brain:lint` is where inbox items get promoted to real wiki entries or archived.
-- This command should take <5 seconds to invoke and return.
+- The inbox is the firehose. `/brain:lint` promotes inbox items to real wiki entries or archives them. This command does not promote — even when classification "obviously" matches a project.
+- Do not read prior conversation context to enrich the capture. Treat the input as the entire payload.
+- Target invocation time: <5 seconds end-to-end. If you find yourself asking a clarifying question, you've already failed the speed bar — write the file and confirm instead.
