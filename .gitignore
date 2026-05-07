@@ -6,8 +6,47 @@
 .idea/
 .vscode/
 
-# Never commit sensitive raw data accidentally if you're pushing a fork
-# Remove these lines if you want to track your own raw/ content
-# raw/jira/
-# raw/prs/
-# raw/meetings/
+# Personal config — never commit
+brain.config.yaml
+
+# User content — never commit. Each user accumulates their own.
+raw/jira/*
+raw/prs/*
+raw/inbox/*
+raw/meetings/*
+raw/daily/*
+raw/docs/*
+!raw/jira/.gitkeep
+!raw/prs/.gitkeep
+!raw/inbox/.gitkeep
+!raw/meetings/.gitkeep
+!raw/daily/.gitkeep
+!raw/docs/.gitkeep
+
+# Lessons accumulate from real corrections — keep stubs only in template
+lessons/*
+!lessons/mistakes.md
+!lessons/preferences.md
+!lessons/patterns.md
+!lessons/gotchas.md
+
+# Projects: only the template is committed; real projects are personal
+wiki/projects/*
+!wiki/projects/_template
+!wiki/projects/_template/**
+!wiki/projects/index.md
+
+# People notes are sensitive
+wiki/people/*
+!wiki/people/.gitkeep
+
+# Reviews are highly sensitive
+wiki/reviews/*
+!wiki/reviews/.gitkeep
+
+# Today's brief is regenerated daily — no value committing
+wiki/now.md
+
+# Session logs are personal — anchored with leading slash to only match the top-level dir
+/sessions/*
+!/sessions/.gitkeep
