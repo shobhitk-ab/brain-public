@@ -1,99 +1,220 @@
 ---
-description: Save a lesson, decision, preference, or gotcha right now — user-triggered on correction
+description: Save a lesson, decision, preference, gotcha, or person note — user-triggered, earned not drafted
 model: opus
-allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
 ---
 
 # /brain:preserve — Save durable memory
 
-User-triggered. The user says this when they've just corrected you or made a decision they want to keep.
+User-triggered. The user runs this when they've just corrected you, decided something worth keeping, or learned a gotcha. **Lessons are earned from real incidents, not drafted from "best practices."** This command exists so the brain learns from corrections and never repeats the same mistake.
 
 ## Instructions for Claude
 
-### Step 1: Ask what kind
+### Step 1: Resolve brain path
+
+Brain path: `$BRAIN_DIR` or `~/brain`. Confirm `$BRAIN/CLAUDE.md` exists. If not, stop with: `No brain at <path>.`
+
+Discover **active projects:** `ls $BRAIN/wiki/projects/` minus `_template/` and dotfiles. Hold this list — used in Step 3.
+
+### Step 2: Ask what kind
 
 Use AskUserQuestion (single-select):
 
-**Question:** "What are we saving?"
+- Question: `What are we saving?`
+- Options:
+  - `Mistake / rule — "don't do X because Y"` → `lessons/mistakes.md`
+  - `Preference — "I like things done this way"` → `lessons/preferences.md`
+  - `Pattern — "this is a recipe that works"` → `lessons/patterns.md`
+  - `Gotcha — surprising behavior in a system` → global or project-scoped (asked next)
+  - `Decision — "we chose X for this specific situation"` → global or project-scoped (asked next)
+  - `Person note — something about a person I work with` → `wiki/people/<Name>.md`
+  - `Cancel`
 
-**Options:**
-1. **Mistake/rule** — "don't do X because Y" — goes to `lessons/mistakes.md`
-2. **Preference** — "I like things done this way" — goes to `lessons/preferences.md`
-3. **Pattern** — "this is a recipe that works" — goes to `lessons/patterns.md`
-4. **Gotcha (global)** — "cross-project landmine" — goes to `lessons/gotchas.md`
-5. **Gotcha (project-scoped)** — "landmine in project X" — goes to `wiki/projects/<name>/gotchas.md`
-6. **Decision** — "we chose X for this specific situation" — goes to `wiki/decisions/` or `wiki/projects/<name>/decisions/`
-7. **Person note** — "something about a person" — goes to `wiki/people/<Name>.md`
+### Step 3: Gather the content
 
-### Step 2: Gather the content
+Pull from recent conversation when possible — the user usually invoked `/brain:preserve` immediately after a correction or decision. If the model can synthesize a 1–2 sentence rule/decision/note from the last few turns, present it for confirmation; otherwise ask.
 
-Based on type, extract from recent conversation OR ask the user for missing bits.
+Apply the **decision-vs-lesson test**:
+> If the rule only makes sense in its original project, it's a decision. If you'd repeat it on any new project, it's a lesson.
 
-Apply the **decision vs. lesson test** from CLAUDE.md:
-> If the statement only makes sense in its original project, it's a decision. If you'd repeat it in a new project, it's a lesson.
+If the user picked `Decision` but the content reads like a general rule that applies anywhere, ask via AskUserQuestion (single-select):
+- Question: `This reads like a general rule, not a project-specific decision. Save as:`
+- Options: `Decision (project-scoped)`, `Lesson (mistake / preference / pattern)`, `Both — link them`
 
-If user picked "decision" but the content reads like a general rule, flag it: "This reads like a general rule — should we also save a lesson that points back to this decision?"
+### Step 4: Ask scope (lessons, decisions, gotchas)
 
-### Step 3: Ask scope (for lessons/decisions)
+Skip this step for `Preference`, `Pattern`, `Person note` — those are inherently global/personal.
 
-"Which projects does this apply to? (global / project-a / project-b / project-c / project-d / multiple)"
+For `Mistake`, `Gotcha`, `Decision`, ask via AskUserQuestion (multi-select):
 
-### Step 4: Write the entry
+- Question: `Which projects does this apply to?`
+- Options (built dynamically):
+  - `Global — applies anywhere, not project-specific`
+  - One option per active project from Step 1 (e.g. `<slug-1>`, `<slug-2>`, ...)
 
-**For mistakes (`lessons/mistakes.md`):** append a new `## Rule: <title>` section following the format in the file header.
+If user picks `Global` AND any project, it stays global with a `mentions:` field. If they pick only specific projects, it becomes project-scoped.
 
-**For preferences (`lessons/preferences.md`):** append a new `## <Topic>` section.
+### Step 5: Write the entry
 
-**For patterns (`lessons/patterns.md`):** append a new `## Pattern: <name>` section.
+Apply per-type rules below. **Append, don't rewrite** — use Edit, not Write.
 
-**For gotchas (global):** append a bullet to `lessons/gotchas.md`.
+#### Mistakes (`$BRAIN/lessons/mistakes.md`)
 
-**For gotchas (project):** append a bullet to `wiki/projects/<name>/gotchas.md`.
+Append a `## ` section with this structure:
 
-**For decisions:** create a new file `YYYY-MM-DD-<slug>.md` in the right directory with frontmatter:
-```yaml
+```markdown
+## <Short rule, imperative form — e.g. "Always await Mongo close()">
+
+**Why:** <The incident — what happened, when (YYYY-MM-DD), where (file/PR/ticket if relevant).>
+**How to apply:** <When this rule kicks in. What signal tells future-Claude this rule is relevant.>
+
+_Scope: <global | <slug-1>, <slug-2>>_
+```
+
+#### Preferences (`$BRAIN/lessons/preferences.md`)
+
+Append a `## ` section:
+
+```markdown
+## <Topic — short, e.g. "Code comments">
+
+**Preference:** <The rule, plainly stated.>
+**Why:** <Why this matters to the user.>
+**How to apply:** <When and how to apply it.>
+```
+
+#### Patterns (`$BRAIN/lessons/patterns.md`)
+
+Append a `## Pattern: <name>` section:
+
+```markdown
+## Pattern: <name — short, e.g. "Parallel fanout via ThreadPoolExecutor">
+
+**Where it applies:** <The shape of problem this fits.>
+**Why it works:** <What property makes it the right move.>
+**Example references:** <Link to 1–2 prior decisions or PRs that exhibit this pattern.>
+```
+
+#### Gotchas — global (`$BRAIN/lessons/gotchas.md`)
+
+Append a bullet:
+
+```markdown
+- **<System / behavior name>.** <Surprising fact in one line.> Expected: <what would feel intuitive>. Actual: <what really happens>.
+  - **Why:** <one-line cause>
+  - **Ref:** <PR, ticket, doc URL>
+```
+
+#### Gotchas — project-scoped (`$BRAIN/wiki/projects/<slug>/gotchas.md`)
+
+Same bullet shape, appended to each scoped project's file.
+
+#### Decisions (global: `$BRAIN/wiki/decisions/YYYY-MM-DD-<slug>.md`; project: `$BRAIN/wiki/projects/<slug>/decisions/YYYY-MM-DD-<slug>.md`)
+
+Create a new file (slug = 3–5 words from the decision title, lowercase-hyphenated):
+
+```markdown
 ---
 type: decision
 date: YYYY-MM-DD
 project: <name or list>
-tags: [<relevant>]
+tags: [<relevant short tags>]
 status: decided
 ---
 
 # <Title>
 
 ## Context
-<what prompted the decision>
+<What prompted the decision. One paragraph.>
 
 ## Decision
-<what was decided>
+<What was decided. Plainly stated.>
 
 ## Alternatives considered
-- <alt 1 — why rejected>
+- <Alternative — why rejected>
+- <Alternative — why rejected>
 
 ## Consequences
-<expected impact, what we're committing to>
+<What we're committing to. Trade-offs.>
 
 ## References
-- <links>
+- <Link — PR, ticket, prior decision, doc URL>
 ```
 
-Then update the project's `_state.md` "Recent decisions" section with a backlink.
+After writing the decision file, append a backlink to each scoped project's `_state.md` "Recent decisions" section:
+- `YYYY-MM-DD — <Title> — [decision file](decisions/YYYY-MM-DD-<slug>.md)`
 
-**For person notes:** check if `wiki/people/<Name>.md` exists. If yes, append to "Recent interactions" and "Notes". If no, create from `wiki/people/_template.md`.
+#### Person notes (`$BRAIN/wiki/people/<Name>.md`)
 
-### Step 5: Confirm
+Ask the user for the person's name (free-text prompt). Validate that it's a name, not a generic "the team" or "someone."
+
+`mkdir -p $BRAIN/wiki/people/` if missing.
+
+If `wiki/people/<Name>.md` exists, append to its "Recent interactions" section. Otherwise create with this template:
+
+```markdown
+---
+type: person
+name: <Name>
+created: YYYY-MM-DD
+---
+
+# <Name>
+
+## Role
+<Their role / team if known.>
+
+## How we work together
+<Frequency, context — e.g. "Weekly 1:1 since 2026-01", "Code review partner on auth-svc">
+
+## What they care about / strengths
+<What you've noticed.>
+
+## Recent interactions
+- YYYY-MM-DD — <one line — context, outcome>
+
+## Notes
+<Anything else worth remembering. Be respectful — this file is yours.>
+```
+
+Always append the new bullet to "Recent interactions" with today's date and the 1-line note that prompted preserve.
+
+### Step 6: Confirm
 
 ```
 SAVED to <file>.
 
 <1-line summary of what was captured>
 
-{If this was a correction during an active session:}
+Scope:  <global | <slug-list>>
+
 Future sessions will load this via /brain:resume.
 ```
 
-### Step 6: Suggest cross-references
+### Step 7: Suggest cross-references
 
-- If saving a decision that exhibits a recurring pattern across 3+ existing decisions: suggest promoting to a pattern.
-- If saving a mistake that overlaps an existing one: show the existing entry, ask if this refines it or is separate.
+- **Pattern emerging from decisions:** if saving a decision and the project has 3+ decisions tagged similarly (overlap on `tags:` or detected via summary keywords), suggest:
+  ```
+  This is the 4th decision in <project> using <pattern-keyword>.
+  Want to promote to lessons/patterns.md? (y/n)
+  ```
+  If yes, walk through the pattern flow (Step 5 → Patterns).
+
+- **Lesson overlap:** if saving a mistake and grep finds an existing entry with overlapping keywords (3+ shared significant words):
+  ```
+  This overlaps with an existing rule:
+    "<existing rule heading>"
+    File: lessons/mistakes.md
+
+  Refine the existing one, or save this as separate?
+  ```
+  Use AskUserQuestion to pick.
+
+- **Gotcha in a project's `gotchas.md` that already has 5+ entries:** flag for the user to consider whether some are now obsolete or worth deduplicating.
+
+## Notes
+
+- **Earned, not drafted.** If the user invokes `/brain:preserve` without an obvious recent correction or decision in conversation context, ask explicitly: `What just happened that prompted this? I'd rather capture the real incident than draft a generic rule.`
+- **Be careful with "person notes."** Keep them respectful, factual, and useful for collaboration. Don't write performance assessments or anything you wouldn't say to the person.
+- **Targeted Edits, not full rewrites.** Lessons files grow over time; preserve their existing entries.
+- **Project list is dynamic.** Read it from `wiki/projects/` at runtime. Never hardcode slugs.

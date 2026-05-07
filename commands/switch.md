@@ -6,17 +6,22 @@ allowed-tools: Read, Bash, Glob, Grep
 
 # /brain:switch — Load project context
 
-**Usage:** `/brain:switch <project>` — e.g. `/brain:switch project-a`
+**Usage:** `/brain:switch <slug>` — e.g. `/brain:switch auth-rewrite`
 
 Loads everything needed to work productively on one project. Use when you're about to dive into focused work.
 
 ## Instructions for Claude
 
-### Step 1: Validate argument
+### Step 1: Resolve brain path and validate argument
 
-If no project name: list active projects from `wiki/projects/index.md` and ask which.
+Brain path: `$BRAIN_DIR` env var, or default `~/brain`. Confirm `$BRAIN/CLAUDE.md` exists (`test -f`). If not, stop with: `No brain at <path> — set BRAIN_DIR or run from a brain directory.`
 
-If name doesn't match a directory under `wiki/projects/`: suggest closest match or ask.
+Build the **valid project list**: `ls $BRAIN/wiki/projects/`, then drop `_template` and any entry starting with `.` or `_`. The remaining names are the only valid `<project>` arguments.
+
+Validate `$ARGUMENTS`:
+- **Empty:** print the valid project list and ask the user which. Do not assume.
+- **Exact match (case-insensitive)** against a valid project name: proceed with the canonical lowercase form.
+- **No match:** print the valid project list and ask the user to pick. Do not auto-suggest "closest match" — the project list is short, fuzzy matching adds risk.
 
 ### Step 2: Read the project stack
 
@@ -55,7 +60,7 @@ RECENT DECISIONS:
 - ...
 
 GOTCHAS (do not re-learn):
-- {top 3–5 from project gotchas.md and global gotchas.md tagged to this project}
+- {top 3–5 from project gotchas.md}
 
 RECENT ACTIVITY (last 7 days):
 - N JIRA updates, M PR events, K meetings — see raw/
@@ -67,10 +72,3 @@ NEXT MOVES (from _state.md):
 READY. What are we doing on <project>?
 ```
 
-### Step 5: Note context switch
-
-If the current session had material work on a different project before this switch, gently suggest:
-
-> "Heads up — before this switch we were working on <other>. Consider /brain:compress to save that context first."
-
-Don't nag if the previous activity was just reading/research.
