@@ -40,6 +40,13 @@ brain/
 │   │   ├── index.md           # one-line status per project
 │   │   ├── _template/         # copy this to onboard a new project
 │   │   └── <your-project>/    # one dir per project
+│   │       ├── _state.md      # current state (rewritten by morning/compress)
+│   │       ├── overview.md    # static project description
+│   │       ├── gotchas.md     # project-specific landmines
+│   │       ├── references.md  # external links
+│   │       ├── matcher.yml    # epic/label/path patterns for auto-tagging ingest
+│   │       ├── decisions/     # ADR-style decisions scoped to this project
+│   │       └── runbooks/      # project-specific procedures
 │   ├── people/                # one file per person you work with
 │   ├── topics/                # cross-cutting knowledge areas
 │   ├── decisions/             # ADR-style significant decisions
@@ -94,10 +101,14 @@ For a brand-new clone of this brain template, run `/brain:setup` once. It walks 
 
 ## Adding a project
 
+The recommended path is **`/brain:track`** — it creates the project inline (with optional JIRA epic, scaffolds files, updates `wiki/projects/index.md`), and tracks the first work item under it in one flow.
+
+Manual fallback if you don't want to use `/brain:track`:
 ```bash
 cp -r wiki/projects/_template wiki/projects/<your-project>
 # edit wiki/projects/<your-project>/overview.md
 # add a line to wiki/projects/index.md
+# create wiki/projects/<your-project>/matcher.yml
 ```
 
 The active project list is read at runtime from `wiki/projects/`. No CLAUDE.md edit needed.
@@ -106,12 +117,16 @@ The active project list is read at runtime from `wiki/projects/`. No CLAUDE.md e
 
 ## JIRA integration
 
-`/brain:ingest-jira` is wired to the **claude.ai Atlassian MCP** (`mcp__claude_ai_Atlassian__*`). Cloud ID, account ID, and default project key live in `brain.config.yaml`.
+`/brain:ingest-jira` and `/brain:track` use the **claude.ai Atlassian MCP** (`mcp__claude_ai_Atlassian__*`). Cloud ID, account ID, and default project key live in `brain.config.yaml`.
 
-If you don't have a JIRA MCP, skip this command. Use `/brain:capture` to paste JIRA content manually.
+Per-project JIRA ticket matching (parent epic → brain-project) is configured in each project's `wiki/projects/<slug>/matcher.yml` under the `jira:` block.
+
+If you don't have a JIRA MCP, skip JIRA-aware commands. Use `/brain:capture` to paste JIRA content manually.
 
 ---
 
 ## PR integration
 
 `/brain:ingest-prs` uses the `gh` CLI. Run `gh auth login` if not already authenticated. The default org and your GitHub handle live in `brain.config.yaml`.
+
+Per-project PR matching is configured in each project's `wiki/projects/<slug>/matcher.yml` (epic keys, repos, title patterns, paths). No global mapping file needed.
