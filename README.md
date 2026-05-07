@@ -111,7 +111,8 @@ Produces a polished draft in a structured format from everything accumulated.
 | `/brain:setup` | First-time onboarding (or to update settings) |
 | `/brain:resume` | Start of any session |
 | `/brain:morning` | First thing in the day |
-| `/brain:switch <project>` | About to focus on one project |
+| `/brain:track [desc]` | Formalize current work as a tracked item |
+| `/brain:switch <slug>` | About to focus on one project |
 | `/brain:capture <thing>` | Quick dump, no conversation needed |
 | `/brain:preserve` | Just corrected Claude or made a decision worth keeping |
 | `/brain:log-review <bucket>` | Something review-worthy just happened |
@@ -129,16 +130,45 @@ You never have to decide. Tell Claude, Claude routes.
 
 | What | Where | How it gets there |
 |---|---|---|
-| Random ideas | `raw/inbox/` | `/brain:capture` or just tell Claude |
-| Meeting notes | `raw/meetings/` | Dictate or paste; Claude writes |
+| Random ideas | `raw/inbox/` | `/brain:capture` |
+| Tracked work (with JIRA ticket) | `raw/jira/` | `/brain:track` or `/brain:ingest-jira` |
+| PRs | `raw/prs/` | `/brain:ingest-prs` |
+| Meeting notes | `raw/meetings/` | Paste; Claude writes |
 | Daily log | `raw/daily/<date>.md` | Claude appends as you work |
-| JIRA snapshots | `raw/jira/` | `/brain:ingest-jira` (daily) |
-| PR snapshots | `raw/prs/` | `/brain:ingest-prs` (daily) |
 | Design docs | `raw/docs/` | Paste or `/brain:capture` |
-| Decisions | `wiki/decisions/` | `/brain:preserve` → decision |
-| Lessons | `lessons/*.md` | `/brain:preserve` → mistake / preference |
-| Review entries | `wiki/reviews/` | `/brain:log-review` or `/brain:compress` |
+| Decisions | `wiki/decisions/` or `wiki/projects/<slug>/decisions/` | `/brain:preserve` → decision |
+| Lessons | `lessons/*.md` | `/brain:preserve` → mistake / preference / pattern / gotcha |
+| Review entries | `wiki/reviews/<period>.md` | `/brain:log-review` or `/brain:compress` |
 | People context | `wiki/people/<Name>.md` | `/brain:preserve` → person note |
+| Project state (live, refreshed) | `wiki/projects/<slug>/_state.md` | Refreshed by `/brain:morning` and `/brain:compress` |
+| Project matchers (auto-tagging config) | `wiki/projects/<slug>/matcher.yml` | Created by `/brain:track`; you extend with new epics/labels over time |
+
+---
+
+## How project tagging works
+
+Each project under `wiki/projects/<slug>/` owns a `matcher.yml` describing how to recognize its work:
+
+```yaml
+# wiki/projects/auth-rewrite/matcher.yml
+jira:
+  epics:
+    - PROJ-189            # parent epic for this workstream
+  summary_patterns:       # fallback when ticket has no parent epic
+    - "(?i)\\bauth\\b"
+  labels:
+    - auth-rewrite
+
+github:
+  repos: ["myorg/auth-svc"]
+  paths: ["services/auth/**"]
+  labels: ["area/auth"]
+  title_patterns: ["^auth:"]
+```
+
+When `/brain:ingest-prs` and `/brain:ingest-jira` run, they walk the **JIRA-key chain** (PR → linked ticket → parent epic → matching project) first, and fall back to GitHub labels / paths / title patterns when no JIRA key is present. Items that match nothing get `needs_triage: true` for later cleanup.
+
+There is **no global mapping file** — config lives with each project. Renaming/deleting a project is `mv` / `rm -rf`, no other coordination needed.
 
 ---
 
