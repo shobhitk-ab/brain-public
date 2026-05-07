@@ -46,17 +46,17 @@ brain/
 │   │       ├── references.md  # external links
 │   │       ├── matcher.yml    # epic/label/path patterns for auto-tagging ingest
 │   │       ├── decisions/     # ADR-style decisions scoped to this project
-│   │       └── runbooks/      # project-specific procedures
+│   │       ├── runbooks/      # project-specific procedures
+│   │       └── sessions/      # compressed session logs for this project
 │   ├── people/                # one file per person you work with
 │   ├── topics/                # cross-cutting knowledge areas
 │   ├── decisions/             # ADR-style significant decisions
 │   └── reviews/               # half-yearly / annual review files
-├── lessons/                   # ALWAYS loaded at session start via /brain:resume
-│   ├── mistakes.md            # "don't do X because Y"
-│   ├── preferences.md         # how you like things done
-│   ├── patterns.md            # recurring structures across work
-│   └── gotchas.md             # surprising behaviors in your systems
-└── sessions/                  # compressed session logs (YYYY-MM-DD-HHmm-topic.md)
+└── lessons/                   # ALWAYS loaded at session start via /brain:resume
+    ├── mistakes.md            # "don't do X because Y"
+    ├── preferences.md         # how you like things done
+    ├── patterns.md            # recurring structures across work
+    └── gotchas.md             # surprising behaviors in your systems
 ```
 
 ---
@@ -74,7 +74,7 @@ brain/
 - **Reads** all of `lessons/` at every session start (`/brain:resume`)
 - **Writes** `raw/` during ingest commands
 - **Rewrites** `wiki/` to reflect current reality
-- **Appends** to `sessions/` at end of each session
+- **Appends** session logs to `wiki/projects/<slug>/sessions/` at end of each substantive session (only when a project tag exists; untagged sessions are not preserved)
 - **Never** edits `raw/` after initial write
 - **Never** deletes files — mark outdated content with a `STALE:` header
 
@@ -87,7 +87,7 @@ Do not draft lessons from scratch. Do not write "general best practices." Every 
 
 ### Session discipline
 Every substantive session ends with `/brain:compress`. This:
-- Writes a compressed session log to `sessions/`
+- Writes a compressed session log to `wiki/projects/<primary-slug>/sessions/` (skipped if no project tag was identified — run `/brain:track` first)
 - Proposes review-worthy entries for `wiki/reviews/`
 - Flags any lessons worth saving
 

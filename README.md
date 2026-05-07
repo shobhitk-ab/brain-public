@@ -138,6 +138,7 @@ You never have to decide. Tell Claude, Claude routes.
 | Design docs | `raw/docs/` | Paste or `/brain:capture` |
 | Decisions | `wiki/decisions/` or `wiki/projects/<slug>/decisions/` | `/brain:preserve` → decision |
 | Lessons | `lessons/*.md` | `/brain:preserve` → mistake / preference / pattern / gotcha |
+| Sessions | `wiki/projects/<slug>/sessions/` | `/brain:compress` (only if a project tag was identified) |
 | Review entries | `wiki/reviews/<period>.md` | `/brain:log-review` or `/brain:compress` |
 | People context | `wiki/people/<Name>.md` | `/brain:preserve` → person note |
 | Project state (live, refreshed) | `wiki/projects/<slug>/_state.md` | Refreshed by `/brain:morning` and `/brain:compress` |
@@ -166,7 +167,7 @@ github:
   title_patterns: ["^auth:"]
 ```
 
-When `/brain:ingest-prs` and `/brain:ingest-jira` run, they walk the **JIRA-key chain** (PR → linked ticket → parent epic → matching project) first, and fall back to GitHub labels / paths / title patterns when no JIRA key is present. Items that match nothing get `needs_triage: true` for later cleanup.
+When `/brain:ingest-prs` and `/brain:ingest-jira` run, they walk the **JIRA-key chain** (PR → linked ticket → parent epic → matching project) first, and fall back to GitHub labels / paths / title patterns when no JIRA key is present. Items that match nothing get `needs_triage: true` and surface in `/brain:morning`'s "Needs quick call" section (top 5/day) and `/brain:lint`'s weekly straggler sweep.
 
 There is **no global mapping file** — config lives with each project. Renaming/deleting a project is `mv` / `rm -rf`, no other coordination needed.
 

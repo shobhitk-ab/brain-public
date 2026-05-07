@@ -42,9 +42,13 @@ Build the **active project list:** `ls $BRAIN/wiki/projects/` minus `_template/`
 3. **All of `$BRAIN/lessons/*.md`** — mistakes, preferences, patterns, gotchas. These are durable memory.
 4. **`$BRAIN/wiki/now.md`** — today's priorities. If the file header says STALE, flag that in output.
 5. **`$BRAIN/wiki/projects/index.md`** — one-line status per project.
-6. **Recent session logs:** `ls -1 $BRAIN/sessions/*.md 2>/dev/null | sort -r | head -N`. For each, read only the content BEFORE `## Raw session log` (summary only — saves tokens).
+6. **Recent session logs:** sessions now live per-project under `wiki/projects/<slug>/sessions/`. Glob across all projects and pick the most recent N by filename:
+   ```bash
+   ls -1 $BRAIN/wiki/projects/*/sessions/*.md 2>/dev/null | sort -r | head -N
+   ```
+   For each, read only the content BEFORE `## Raw session log` (summary only — saves tokens).
 7. **If topic is a project name:** also read `$BRAIN/wiki/projects/<topic>/_state.md` and `$BRAIN/wiki/projects/<topic>/gotchas.md`.
-8. **If topic is provided and not already covered:** `grep -l -i "<topic>" $BRAIN/sessions/*.md $BRAIN/wiki/projects/*/_state.md $BRAIN/wiki/decisions/*.md 2>/dev/null` — read the matching files' summaries (top 5).
+8. **If topic is provided and not already covered:** `grep -l -i "<topic>" $BRAIN/wiki/projects/*/sessions/*.md $BRAIN/wiki/projects/*/_state.md $BRAIN/wiki/decisions/*.md 2>/dev/null` — read the matching files' summaries (top 5).
 
 ### Step 4: Output a tight briefing
 
@@ -89,7 +93,7 @@ Cap output at ~30 lines. If too many active projects, truncate the section as no
 After the briefing, append warnings (one line each) for any of:
 
 - **`now.md` is stale.** Detected by: the file's first 3 lines contain `<!-- STALE:` (HTML comment, the format `morning` removes when regenerating) **or** the file's `# Now — YYYY-MM-DD` header date is older than today **or** mtime is >24h old. Suggest `/brain:morning`.
-- **Any project `_state.md` is stale relative to its raw activity.** For each active project, compare its `_state.md` mtime against the newest mtime among `raw/jira/`, `raw/prs/`, `raw/meetings/` files whose `project:` frontmatter equals the project slug. If raw is fresh (last 7 days) but `_state.md` is >7 days old → flag and suggest `/brain:morning`.
+- **Any project `_state.md` is stale relative to its raw activity.** For each active project, compare its `_state.md` mtime against the newest mtime among `raw/jira/`, `raw/prs/`, `raw/meetings/` files whose `projects:` frontmatter contains the project slug. If raw is fresh (last 7 days) but `_state.md` is >7 days old → flag and suggest `/brain:morning`.
 - **Ingestion is stale.** Newest mtime in `raw/jira/` or `raw/prs/` is >2 days old → flag and suggest the matching `/brain:ingest-*`.
 
 Skip a warning entirely if its data isn't yet meaningful (e.g., no raw files exist yet for a fresh brain).

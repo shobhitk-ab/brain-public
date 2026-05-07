@@ -16,6 +16,14 @@ Brain path: `$BRAIN_DIR` or `~/brain`. Confirm `$BRAIN/CLAUDE.md` exists. If not
 
 Discover **active projects:** `ls $BRAIN/wiki/projects/` minus `_template/` and dotfiles. Hold this list — used in Step 3.
 
+Detect the Claude Code session ID (best-effort, same heuristic as `track`/`compress`):
+```bash
+ENCODED=$(pwd | sed 's|/|-|g')
+SESSION_ID=$(ls -t "$HOME/.claude/projects/${ENCODED}"/*.jsonl 2>/dev/null \
+  | head -1 | xargs -I {} basename {} .jsonl)
+```
+Used to stamp the saved entry so future sessions know where the lesson came from. If empty, write `claude_session_id: null`.
+
 ### Step 2: Ask what kind
 
 Use AskUserQuestion (single-select):
@@ -68,6 +76,7 @@ Append a `## ` section with this structure:
 **Why:** <The incident — what happened, when (YYYY-MM-DD), where (file/PR/ticket if relevant).>
 **How to apply:** <When this rule kicks in. What signal tells future-Claude this rule is relevant.>
 
+_Source: claude_session_id: <SESSION_ID or null>_
 _Scope: <global | <slug-1>, <slug-2>>_
 ```
 
@@ -81,6 +90,8 @@ Append a `## ` section:
 **Preference:** <The rule, plainly stated.>
 **Why:** <Why this matters to the user.>
 **How to apply:** <When and how to apply it.>
+
+_Source: claude_session_id: <SESSION_ID or null>_
 ```
 
 #### Patterns (`$BRAIN/lessons/patterns.md`)
@@ -93,6 +104,8 @@ Append a `## Pattern: <name>` section:
 **Where it applies:** <The shape of problem this fits.>
 **Why it works:** <What property makes it the right move.>
 **Example references:** <Link to 1–2 prior decisions or PRs that exhibit this pattern.>
+
+_Source: claude_session_id: <SESSION_ID or null>_
 ```
 
 #### Gotchas — global (`$BRAIN/lessons/gotchas.md`)
@@ -102,7 +115,7 @@ Append a bullet:
 ```markdown
 - **<System / behavior name>.** <Surprising fact in one line.> Expected: <what would feel intuitive>. Actual: <what really happens>.
   - **Why:** <one-line cause>
-  - **Ref:** <PR, ticket, doc URL>
+  - **Ref:** <PR, ticket, doc URL — or "session <SESSION_ID>">
 ```
 
 #### Gotchas — project-scoped (`$BRAIN/wiki/projects/<slug>/gotchas.md`)
@@ -117,9 +130,10 @@ Create a new file (slug = 3–5 words from the decision title, lowercase-hyphena
 ---
 type: decision
 date: YYYY-MM-DD
-project: <name or list>
+projects: [<list of slugs, or just "global">]
 tags: [<relevant short tags>]
 status: decided
+claude_session_id: <SESSION_ID or null>
 ---
 
 # <Title>
@@ -186,6 +200,7 @@ SAVED to <file>.
 
 <1-line summary of what was captured>
 
+Source: session <SESSION_ID or "(no session id detected)">
 Scope:  <global | <slug-list>>
 
 Future sessions will load this via /brain:resume.
@@ -218,3 +233,4 @@ Future sessions will load this via /brain:resume.
 - **Be careful with "person notes."** Keep them respectful, factual, and useful for collaboration. Don't write performance assessments or anything you wouldn't say to the person.
 - **Targeted Edits, not full rewrites.** Lessons files grow over time; preserve their existing entries.
 - **Project list is dynamic.** Read it from `wiki/projects/` at runtime. Never hardcode slugs.
+- **Cross-session traceability.** The `claude_session_id` field is the breadcrumb back to where the lesson was earned. Useful months later when reviewing patterns.

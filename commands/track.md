@@ -237,6 +237,18 @@ Use AskUserQuestion (single-select):
 
 Set `ticket_key = null`. Continue to Step 6.
 
+### Step 4b: Capture the Claude Code session ID
+
+Before persisting, detect the current Claude Code session ID. Best-effort heuristic — find the newest JSONL file in the encoded-cwd dir under `~/.claude/projects/`:
+
+```bash
+ENCODED=$(pwd | sed 's|/|-|g')
+SESSION_ID=$(ls -t "$HOME/.claude/projects/${ENCODED}"/*.jsonl 2>/dev/null \
+  | head -1 | xargs -I {} basename {} .jsonl)
+```
+
+If `SESSION_ID` is empty (Claude Code may have stored it elsewhere, or the cwd dir doesn't exist), set `claude_session_id: null`. Don't fail.
+
 ### Step 5: Persist (with ticket)
 
 If a ticket key exists (created or linked), write `$BRAIN/raw/jira/YYYY-MM-DD-<KEY>.md`:
@@ -249,6 +261,7 @@ projects: [<slug>]
 status: <ticket status>
 parent_epic: <epic key or null>
 created_via: /brain:track
+claude_session_id: <SESSION_ID or null>
 ingested: YYYY-MM-DD
 url: <ticket URL>
 ---
@@ -272,6 +285,7 @@ time: HH:MM:SS
 projects: [<slug>] or []
 status: unprocessed
 created_via: /brain:track
+claude_session_id: <SESSION_ID or null>
 ---
 
 # <title — first sentence ≤60 chars>

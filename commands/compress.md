@@ -12,7 +12,7 @@ Run before `/compact` or closing a session. Saves a searchable log, proposes rev
 
 ### Step 1: Detect brain
 
-Use `$BRAIN_DIR` env var or default `~/brain`. Confirm `$BRAIN/CLAUDE.md` exists.
+Use `$BRAIN_DIR` env var or default `~/brain`. Confirm `$BRAIN/CLAUDE.md` exists. If not, stop with: `No brain at <path>.`
 
 ### Step 2: Ask what to preserve
 
@@ -33,41 +33,62 @@ Use AskUserQuestion (multi-select):
 
 Scan the session. **Only flag an entry if it has an external artifact** (PR, JIRA ticket, design doc, meeting, decision). This filter is load-bearing — skip anything without an artifact.
 
-For each candidate, classify into one of: Impact, Leadership, Execution, Craft. Propose to user:
+For each candidate, classify into one of: `Impact | Leadership | Execution | Craft`.
 
+Propose to user with AskUserQuestion (multi-select):
+
+- Question: `Approve review entries to append to the current review file?`
+- Options: one per candidate (with bucket label) plus a final option `None — skip review entries this run`.
+
+Show in the message body above the question:
 ```
-Review-worthy entries I noticed (for wiki/reviews/fy26-h1.md):
-
-1. [Execution] Shipped X — PR#NNNN
-2. [Leadership] Drove alignment with team Y in meeting on YYYY-MM-DD
-3. [Impact] Reduced Z by N% — evidence: dashboard link
-
-Approve which? (all / none / list numbers / edit)
+[Execution]  Shipped X — PR#NNNN
+[Leadership] Drove alignment with team Y — meeting 2026-05-07
+[Impact]     Reduced Z by N% — dashboard link
 ```
 
-If none qualify: skip this step silently.
+If none qualify, skip this step silently.
 
-### Step 4: Propose lessons (user-triggered, not auto-save)
+### Step 4: Propose lessons (flagged, not auto-saved)
 
-Scan for points where the user corrected you. Do NOT auto-save. Instead:
+Scan for points where the user corrected you. Do NOT auto-save lessons.
+
+List the candidates with their conversation context, then tell the user:
 
 ```
 I noticed these corrections in the session:
-1. "Don't X, do Y" — context: ...
-2. "We always Z in project-a" — context: ...
+1. "<paraphrased rule>" — context: <what triggered it>
+2. "<paraphrased rule>" — context: <what triggered it>
 
-Want to save any as lessons? Run /brain:preserve to save.
+Want to save any as lessons? Run /brain:preserve.
 ```
 
-The user runs `/brain:preserve` separately (their explicit preference).
+These also show up in the session log under "Potential lessons noticed" so they're not lost if the user skips `/brain:preserve` now.
 
 ### Step 5: Propose a topic slug
 
-Suggest a concise topic (3-5 words, lowercase, hyphens): `project-a-feature-x`, `project-b-v2-review`, etc.
+Suggest a concise topic (3-5 words, lowercase, hyphens): `<slug>-feature-x`, `<slug>-v2-review`, etc.
 
 ### Step 6: Generate session log
 
-Filename: `YYYY-MM-DD-HHMM-<slug>.md` in `$BRAIN/sessions/`.
+**Project gate.** If `projects` (detected from session content) is empty, **do not write a session log.** Output:
+```
+No project context detected — skipping session log.
+Tip: run /brain:track first to associate work with a project, then re-run /brain:compress.
+```
+And continue to Step 7 (review entries can still be appended even without a session log).
+
+If `projects` is non-empty:
+
+- The **primary project** is the first slug in the list — the one with the most context in the session.
+- Filename: `$BRAIN/wiki/projects/<primary-slug>/sessions/YYYY-MM-DD-HHMM-<slug>.md`. Create the `sessions/` subdir if missing.
+- Detect the Claude Code session ID (best-effort heuristic):
+  ```bash
+  ENCODED=$(pwd | sed 's|/|-|g')
+  SESSION_ID=$(ls -t "$HOME/.claude/projects/${ENCODED}"/*.jsonl 2>/dev/null \
+    | head -1 | xargs -I {} basename {} .jsonl)
+  ```
+  If empty, write `claude_session_id: null`.
 
 Content:
 
@@ -77,8 +98,9 @@ type: session
 date: YYYY-MM-DD
 time: HH:MM
 topic: <slug>
-projects: [<detected project tags>]
+projects: [<detected project tags — primary first>]
 keywords: [<extracted keywords>]
+claude_session_id: <SESSION_ID or null>
 ---
 
 # Session: YYYY-MM-DD HH:MM — <topic>
@@ -87,6 +109,7 @@ keywords: [<extracted keywords>]
 **Keywords:** <list>
 **Projects:** <list>
 **Outcome:** <1 sentence>
+**Resume:** `claude --resume <SESSION_ID>`   (omit if claude_session_id is null)
 
 ## Decisions made
 - <if selected>
@@ -124,12 +147,18 @@ keywords: [<extracted keywords>]
 
 ### Step 7: Append approved review entries
 
-For each review entry the user approved, append to the correct section of the current review file (`$BRAIN/wiki/reviews/fy26-h1.md` — detect current period by newest file matching `fy*-h*.md`). Also append the artifact to the **Raw evidence pool** section.
+Target file: `$BRAIN/wiki/reviews/<period>.md` — detect current period by newest file matching `fy*-h*.md` (e.g., `fy26-h1.md`). If no review file exists, **don't create it here** — suggest running `/brain:log-review` once first. Skip Step 7's append in that case and report it as a non-fatal skip.
+
+If the file exists:
+- For each approved entry, append to the matching bucket section (`## Impact` / `## Leadership` / `## Execution` / `## Craft`).
+- Entry shape mirrors `/brain:log-review`'s shape (outcome — quantification — Before/After for Impact — Evidence: [link]).
+- Append the artifact to the matching `## Raw evidence pool` subsection (PR / JIRA / Doc / Meeting / Decision). Skip if already listed (idempotent).
+- Use Edit, not Write.
 
 ### Step 8: Update project `_state.md` if material progress was made
 
 If the session produced concrete progress on a project (PR merged, decision, meeting with outcome), update `$BRAIN/wiki/projects/<project>/_state.md`:
-- Add to "Recent decisions" / "Recent meetings" / "Recent PRs" sections with backlink to raw/ or sessions/
+- Add to "Recent decisions" / "Recent meetings" / "Recent PRs" sections with backlink to `raw/` or `wiki/projects/<project>/sessions/`
 - Update "In flight now" and "Next moves" if they changed
 - Update "Last updated" timestamp
 
@@ -140,8 +169,10 @@ Do NOT rewrite the whole file — targeted edits only.
 ```
 SAVED.
 
-Session log:  sessions/YYYY-MM-DD-HHMM-<slug>.md
-Review entries appended: <count> (to wiki/reviews/fy26-h1.md)
+Session log:  wiki/projects/<primary>/sessions/YYYY-MM-DD-HHMM-<slug>.md
+              (or "skipped — no project tagged")
+Review entries appended: <count> (to wiki/reviews/<period>.md)
+                        (or "skipped — review file not initialized; run /brain:log-review first")
 Project state updated: <list of project files touched, or "none">
 Potential lessons flagged: <count>  — run /brain:preserve to save any
 
