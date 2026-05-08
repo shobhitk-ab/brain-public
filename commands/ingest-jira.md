@@ -70,11 +70,26 @@ After both passes:
 - Else if any match came from 3b → `matched_via: jira_fallback`
 - Else → `projects: []`, `needs_triage: true`, `matched_via: none`
 
+#### Step 3d — Preserve user-set tags from existing file
+
+Before writing, check whether `$BRAIN/raw/jira/YYYY-MM-DD-<KEY>.md` already exists (e.g., from an earlier `/brain:track` invocation today). If it does, read its frontmatter and:
+
+- **Union `projects:`.** Final `projects` = unique merge of `existing.projects` and the matcher-computed list. Matcher additions are kept; user-set tags are never dropped.
+- **Recompute `needs_triage`.** `false` if the unioned list is non-empty, `true` only if both sources yielded nothing.
+- **Adjust `matched_via`:**
+  - If matcher found something (3a or 3b): keep `jira_epic` or `jira_fallback`.
+  - Else if `existing.projects` was non-empty: `matched_via: user_tagged`.
+  - Else: `matched_via: none`.
+- **Preserve `created_via`** from the existing file if set (e.g., `/brain:track`). Otherwise omit the field — ingest doesn't claim creation.
+- **Preserve `claude_session_id`** from the existing file if set. Ingest doesn't capture session IDs itself.
+
+If no existing file, proceed with the matcher-only result.
+
 ### Step 4: Write one file per ticket
 
 Path: `$BRAIN/raw/jira/YYYY-MM-DD-<KEY>.md`. `mkdir -p` if missing.
 
-If a file with this name exists today, **overwrite it** — ticket state may change during the day.
+If a file with this name exists today, **overwrite it** — ticket state may change during the day. The user-set fields preserved in Step 3d are re-emitted in the new file.
 
 ```markdown
 ---
@@ -84,11 +99,13 @@ status: <status>
 priority: <priority>
 assignee: <displayName or null>
 reporter: <displayName or null>
-projects: [<list of matched slugs, or []>]
+projects: [<unioned list — matcher ∪ existing, or []>]
 needs_triage: <true | false>
-matched_via: jira_epic | jira_fallback | none
+matched_via: jira_epic | jira_fallback | user_tagged | none
 parent_epic: <parent.key or null>
 labels: [<ticket labels>]
+created_via: <preserved from existing file if present, else omit>
+claude_session_id: <preserved from existing file if present, else omit>
 ingested: YYYY-MM-DD
 updated: <ISO date>
 url: https://<site_url>/browse/<KEY>

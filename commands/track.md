@@ -202,7 +202,11 @@ Use AskUserQuestion (single-select):
 
 1. Read `$BRAIN/wiki/projects/<slug>/matcher.yml`. Get `jira.epics` (list).
 2. Determine default JIRA project: extract the prefix from the first epic key (e.g., `PROJ` from `PROJ-189`). If `epics` is empty, fall back to `jira.default_project_key` from `brain.config.yaml`; if that's also empty, prompt the user.
-3. If multiple epics in the list, ask which one to attach to. Default to the first. Offer "no epic" as a choice.
+3. **Pick the epic anchor (always optional).** Ask via AskUserQuestion (single-select):
+   - Question: `Attach this ticket to a JIRA epic?`
+   - Options: one entry per epic in `jira.epics` (recommended default = first epic), plus a final `No epic — track standalone` option.
+   - If `jira.epics` is empty, skip this prompt and set `epic_key = null` (no epic to offer).
+   - Rationale: small fixes don't always belong under the project's workstream epic. The user gets a clean opt-out every time, even when the project has exactly one epic.
 4. Use `jira.cloud_id` from `brain.config.yaml` (no per-run discovery needed).
 5. Confirm via AskUserQuestion (single-select). Show the preview in your message body, then ask:
    - Question: `Create this ticket?`
@@ -295,6 +299,45 @@ claude_session_id: <SESSION_ID or null>
 
 Slug rule: 2–4 words from description, lowercase, hyphenated. Fall back to `tracked-note` if too short.
 
+### Step 6c: Seed session log stub (only if project_slug is set)
+
+Create a stub session log so the session is discoverable from `/brain:switch` immediately — `/brain:compress` later upgrades the stub into a full log if the user runs it.
+
+- **Skip** entirely if `project_slug` is null (no project, no log home).
+- **Skip** if a session log for the current `claude_session_id` already exists anywhere under `$BRAIN/wiki/projects/*/sessions/*.md` (e.g., a prior `/brain:track` in the same session). Detect via:
+  ```bash
+  grep -l "^claude_session_id: ${SESSION_ID}\$" "$BRAIN"/wiki/projects/*/sessions/*.md 2>/dev/null
+  ```
+  If a match is found, leave the existing file alone and continue.
+- **Otherwise write** `$BRAIN/wiki/projects/<slug>/sessions/YYYY-MM-DD-HHMM-<topic-slug>.md`. `mkdir -p` the `sessions/` dir if missing. `HHMM` is track-time (now). `<topic-slug>` is 2–4 words from the description, lowercase-hyphenated; fall back to `tracked-session` if too short.
+
+Stub content:
+
+```markdown
+---
+type: session
+date: YYYY-MM-DD
+time: HH:MM
+topic: <topic-slug>
+projects: [<slug>]
+status: in-progress
+ticket: <KEY or null>
+claude_session_id: <SESSION_ID or null>
+started_via: /brain:track
+---
+
+# Session: YYYY-MM-DD HH:MM — <topic-slug>
+
+## Started
+<description>
+
+**Project:** <slug>
+**Ticket:** <KEY> — <ticket URL>           (omit the whole line if no ticket)
+**Resume:** `claude --resume <SESSION_ID>` (omit if claude_session_id is null)
+
+_Stub created by /brain:track. /brain:compress at end of session will fill in outcome, decisions, files modified, follow-ups, and the raw session log._
+```
+
 ### Step 7: Update project state (only if a ticket exists)
 
 Open `$BRAIN/wiki/projects/<slug>/_state.md`. Append a bullet to the "In flight now" section:
@@ -311,8 +354,9 @@ TRACKED: <KEY or inbox path>
   Project: <slug or "—">
   Epic:    <epic key or "—">
   File:    raw/jira/<file>  or  raw/inbox/<file>
-  State:   wiki/projects/<slug>/_state.md updated   (if ticket)
-  JIRA:    <ticket URL>   (if ticket)
+  Session: wiki/projects/<slug>/sessions/<file>   (if project_slug; "—" otherwise)
+  State:   wiki/projects/<slug>/_state.md updated (if ticket)
+  JIRA:    <ticket URL>                           (if ticket)
 ```
 
 Nothing else. The user is back to working.

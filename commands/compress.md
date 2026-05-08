@@ -87,6 +87,33 @@ Suggest a concise topic (3-5 words, lowercase, hyphens): `<slug>-feature-x`, `<s
 
 ### Step 6: Generate session log
 
+**Detect the Claude Code session ID first** (best-effort heuristic):
+```bash
+ENCODED=$(pwd | sed 's|/|-|g')
+SESSION_ID=$(ls -t "$HOME/.claude/projects/${ENCODED}"/*.jsonl 2>/dev/null \
+  | head -1 | xargs -I {} basename {} .jsonl)
+```
+If empty, treat `claude_session_id` as null below.
+
+**Look for an existing stub from `/brain:track` for this session.** If `SESSION_ID` is non-null:
+```bash
+EXISTING=$(grep -l "^claude_session_id: ${SESSION_ID}\$" "$BRAIN"/wiki/projects/*/sessions/*.md 2>/dev/null | head -1)
+```
+
+#### Step 6a — Upgrade existing stub (when EXISTING is set)
+
+The stub was created by `/brain:track` mid-session. Upgrade it in place rather than writing a second file:
+
+- **Read the stub's frontmatter** for canonical `topic`, `projects`, `ticket`, `started_via`, `date`, `time`. These are authoritative — don't rename the file or overwrite frontmatter from session-content guesses.
+- **Union projects:** if compress detects additional projects beyond what the stub recorded, append them after the stub's existing list (don't drop or reorder; the stub's first project stays primary).
+- **Update frontmatter:** flip `status: in-progress` → `status: complete`. Add `compressed_via: /brain:compress` and `compressed_at: YYYY-MM-DD HH:MM`. Keep everything else.
+- **Replace the body** below the frontmatter with the full session-log template (below). Preserve the original `## Started` content as the lead-in to `## Resume context` so the original framing isn't lost.
+- Use Edit on the existing path. Do **not** create a new file under a different `<primary-slug>` even if compress's primary detection differs from the stub's project — the stub's project is the user's intent.
+
+Skip Step 6's "project gate" when upgrading — the stub already has a project tag by construction.
+
+#### Step 6b — Fresh log (when no stub exists)
+
 **Project gate.** If `projects` (detected from session content) is empty, **do not write a session log.** Output:
 ```
 No project context detected — skipping session log.
@@ -98,15 +125,8 @@ If `projects` is non-empty:
 
 - The **primary project** is the first slug in the list — the one with the most context in the session.
 - Filename: `$BRAIN/wiki/projects/<primary-slug>/sessions/YYYY-MM-DD-HHMM-<slug>.md`. Create the `sessions/` subdir if missing.
-- Detect the Claude Code session ID (best-effort heuristic):
-  ```bash
-  ENCODED=$(pwd | sed 's|/|-|g')
-  SESSION_ID=$(ls -t "$HOME/.claude/projects/${ENCODED}"/*.jsonl 2>/dev/null \
-    | head -1 | xargs -I {} basename {} .jsonl)
-  ```
-  If empty, write `claude_session_id: null`.
 
-Content:
+Content (used in both 6a and 6b — for 6a, replace only the body below the frontmatter):
 
 ```markdown
 ---
