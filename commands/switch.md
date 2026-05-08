@@ -37,7 +37,7 @@ In order:
 ### Step 3: Also load
 
 - **All of `lessons/*.md`** — already loaded if `/brain:resume` ran, but reconfirm
-- **Sessions for this project (primary location):** `ls -t $BRAIN/wiki/projects/<name>/sessions/*.md 2>/dev/null | head -3` — read the summary block (everything before `## Raw session log`).
+- **Sessions for this project (primary location):** `ls -t $BRAIN/wiki/projects/<name>/sessions/*.md 2>/dev/null | head -3` — read the summary block (everything before `## Raw session log`). For each session, also extract the `tickets:` frontmatter array — it lists every JIRA key the session touched.
 - **Sessions for this project tagged elsewhere (cross-project):** `grep -l "projects:.*\\b<name>\\b" $BRAIN/wiki/projects/*/sessions/*.md 2>/dev/null | grep -v "/<name>/sessions/"` — capture the few that may exist if a cross-project session was filed under another project's primary. Read summaries. Cap total sessions surfaced at 3.
 
 ### Step 4: Output focused briefing
@@ -68,6 +68,7 @@ RECENT ACTIVITY (last 7 days):
 
 RECENT SESSIONS (last 3 for <project>):
 - YYYY-MM-DD HH:MM — <topic> — <one-line outcome>
+  Tickets: <KEY1>, <KEY2>                              (omit line if tickets is empty)
   Resume: claude --resume <claude_session_id>          (omit line if null)
 - ...
 

@@ -255,6 +255,10 @@ If `SESSION_ID` is empty (Claude Code may have stored it elsewhere, or the cwd d
 
 ### Step 5: Persist (with ticket)
 
+Compute the stub path that Step 6c will write to (so it can be referenced from this step's `session_log` field):
+- If `project_slug` is set: `STUB_PATH = wiki/projects/<project_slug>/sessions/YYYY-MM-DD-HHMM-<topic-slug>.md` (relative to `$BRAIN`). `<topic-slug>` is 2–4 words from the description, lowercase-hyphenated; fall back to `tracked-session`.
+- If `project_slug` is null: `STUB_PATH = null`.
+
 If a ticket key exists (created or linked), write `$BRAIN/raw/jira/YYYY-MM-DD-<KEY>.md`:
 
 ```markdown
@@ -266,6 +270,7 @@ status: <ticket status>
 parent_epic: <epic key or null>
 created_via: /brain:track
 claude_session_id: <SESSION_ID or null>
+session_log: <STUB_PATH or null>
 ingested: YYYY-MM-DD
 url: <ticket URL>
 ---
@@ -275,6 +280,7 @@ url: <ticket URL>
 
 ## Tracked
 Created or linked via /brain:track on YYYY-MM-DD HH:MM.
+Session log: <STUB_PATH or "—">
 ```
 
 ### Step 6: Persist (no ticket)
@@ -290,6 +296,7 @@ projects: [<slug>] or []
 status: unprocessed
 created_via: /brain:track
 claude_session_id: <SESSION_ID or null>
+session_log: <STUB_PATH or null>
 ---
 
 # <title — first sentence ≤60 chars>
@@ -299,19 +306,35 @@ claude_session_id: <SESSION_ID or null>
 
 Slug rule: 2–4 words from description, lowercase, hyphenated. Fall back to `tracked-note` if too short.
 
-### Step 6c: Seed session log stub (only if project_slug is set)
+### Step 6c: Seed or update the session log stub (only if project_slug is set)
 
-Create a stub session log so the session is discoverable from `/brain:switch` immediately — `/brain:compress` later upgrades the stub into a full log if the user runs it.
+The stub anchors the session so `/brain:switch` finds it immediately. Multiple `/brain:track` calls in the same session each contribute their ticket to the same stub — the session ↔ tickets relationship is **many-to-many**.
 
-- **Skip** entirely if `project_slug` is null (no project, no log home).
-- **Skip** if a session log for the current `claude_session_id` already exists anywhere under `$BRAIN/wiki/projects/*/sessions/*.md` (e.g., a prior `/brain:track` in the same session). Detect via:
-  ```bash
-  grep -l "^claude_session_id: ${SESSION_ID}\$" "$BRAIN"/wiki/projects/*/sessions/*.md 2>/dev/null
-  ```
-  If a match is found, leave the existing file alone and continue.
-- **Otherwise write** `$BRAIN/wiki/projects/<slug>/sessions/YYYY-MM-DD-HHMM-<topic-slug>.md`. `mkdir -p` the `sessions/` dir if missing. `HHMM` is track-time (now). `<topic-slug>` is 2–4 words from the description, lowercase-hyphenated; fall back to `tracked-session` if too short.
+**Skip** entirely if `project_slug` is null (no project, no log home).
 
-Stub content:
+**Detect existing stub for this session** (could be the path Step 5/6 just referenced, or one created by an earlier `/brain:track` call in the same session):
+```bash
+EXISTING_STUB=$(grep -l "^claude_session_id: ${SESSION_ID}\$" "$BRAIN"/wiki/projects/*/sessions/*.md 2>/dev/null | head -1)
+```
+
+#### If an existing stub is found — append this ticket
+
+Use Edit to update the existing stub (do **not** create a second file):
+
+1. **Update frontmatter `tickets:`** — read the current array. If `<KEY>` is already present, no-op. Otherwise append: `tickets: [<KEY1>, <KEY2>]`. If the user added work via "no ticket" (project-tagged inbox note), don't touch the `tickets:` array — there's nothing to add.
+2. **Append a `## Tracked: <KEY>` section** under the existing body (after the original `## Started` block), with:
+   ```markdown
+   ## Tracked: <KEY>
+   <description>
+
+   **Ticket:** <KEY> — <ticket URL>
+   **Tracked at:** YYYY-MM-DD HH:MM
+   ```
+3. Don't rename the file or change `topic`/`time` — the original framing stays.
+
+#### If no existing stub — write a fresh one
+
+Path: `$BRAIN/<STUB_PATH>` (computed in Step 5). `mkdir -p` the `sessions/` dir if missing.
 
 ```markdown
 ---
@@ -321,7 +344,7 @@ time: HH:MM
 topic: <topic-slug>
 projects: [<slug>]
 status: in-progress
-ticket: <KEY or null>
+tickets: [<KEY>]                # empty list [] if no-ticket path
 claude_session_id: <SESSION_ID or null>
 started_via: /brain:track
 ---

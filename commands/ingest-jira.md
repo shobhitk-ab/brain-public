@@ -82,6 +82,7 @@ Before writing, check whether `$BRAIN/raw/jira/YYYY-MM-DD-<KEY>.md` already exis
   - Else: `matched_via: none`.
 - **Preserve `created_via`** from the existing file if set (e.g., `/brain:track`). Otherwise omit the field — ingest doesn't claim creation.
 - **Preserve `claude_session_id`** from the existing file if set. Ingest doesn't capture session IDs itself.
+- **Preserve `session_log`** from the existing file if set. Points to the session log that originally tracked this ticket — ingest must not drop the bidirectional link.
 
 If no existing file, proceed with the matcher-only result.
 
@@ -106,6 +107,7 @@ parent_epic: <parent.key or null>
 labels: [<ticket labels>]
 created_via: <preserved from existing file if present, else omit>
 claude_session_id: <preserved from existing file if present, else omit>
+session_log: <preserved from existing file if present, else omit>
 ingested: YYYY-MM-DD
 updated: <ISO date>
 url: https://<site_url>/browse/<KEY>

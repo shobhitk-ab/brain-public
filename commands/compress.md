@@ -1,7 +1,7 @@
 ---
-description: End-of-session — save session log, propose review entries, propose lessons
+description: End-of-session — save session log, propose review entries, propose lessons, optionally comment session summary on tracked JIRA tickets
 model: opus
-allowed-tools: Read, Write, Bash, AskUserQuestion
+allowed-tools: Read, Write, Edit, Bash, AskUserQuestion, mcp__claude_ai_Atlassian__addCommentToJiraIssue
 ---
 
 # /brain:compress — Save session
@@ -104,10 +104,11 @@ EXISTING=$(grep -l "^claude_session_id: ${SESSION_ID}\$" "$BRAIN"/wiki/projects/
 
 The stub was created by `/brain:track` mid-session. Upgrade it in place rather than writing a second file:
 
-- **Read the stub's frontmatter** for canonical `topic`, `projects`, `ticket`, `started_via`, `date`, `time`. These are authoritative — don't rename the file or overwrite frontmatter from session-content guesses.
+- **Read the stub's frontmatter** for canonical `topic`, `projects`, `tickets`, `started_via`, `date`, `time`. These are authoritative — don't rename the file or overwrite frontmatter from session-content guesses.
+- **Preserve `tickets:` array** verbatim — every key the user `/brain:track`ed during the session is here. Surface them in the body's `## Tickets touched` section (template below).
 - **Union projects:** if compress detects additional projects beyond what the stub recorded, append them after the stub's existing list (don't drop or reorder; the stub's first project stays primary).
 - **Update frontmatter:** flip `status: in-progress` → `status: complete`. Add `compressed_via: /brain:compress` and `compressed_at: YYYY-MM-DD HH:MM`. Keep everything else.
-- **Replace the body** below the frontmatter with the full session-log template (below). Preserve the original `## Started` content as the lead-in to `## Resume context` so the original framing isn't lost.
+- **Replace the body** below the frontmatter with the full session-log template (below). Preserve the original `## Started` content as the lead-in to `## Resume context` so the original framing isn't lost. Preserve any `## Tracked: <KEY>` sections (from multiple `/brain:track` invocations) — fold their descriptions into the new `## Tickets touched` section.
 - Use Edit on the existing path. Do **not** create a new file under a different `<primary-slug>` even if compress's primary detection differs from the stub's project — the stub's project is the user's intent.
 
 Skip Step 6's "project gate" when upgrading — the stub already has a project tag by construction.
@@ -135,6 +136,7 @@ date: YYYY-MM-DD
 time: HH:MM
 topic: <slug>
 projects: [<detected project tags — primary first>]
+tickets: [<KEYs from stub, preserved; or [] for fresh logs without /brain:track>]
 keywords: [<extracted keywords>]
 claude_session_id: <SESSION_ID or null>
 ---
@@ -144,8 +146,14 @@ claude_session_id: <SESSION_ID or null>
 ## Quick reference
 **Keywords:** <list>
 **Projects:** <list>
+**Tickets:** <KEY1>, <KEY2>   (omit line if tickets is empty)
 **Outcome:** <1 sentence>
 **Resume:** `claude --resume <SESSION_ID>`   (omit if claude_session_id is null)
+
+## Tickets touched
+- **<KEY1>** — <one-line outcome / what changed for this ticket> — [<KEY1>](<ticket URL>)
+- **<KEY2>** — <one-line outcome> — [<KEY2>](<ticket URL>)
+(omit the whole section if tickets is empty)
 
 ## Decisions made
 - <if selected>
@@ -202,6 +210,42 @@ If the session produced concrete progress on a project (PR merged, decision, mee
 
 Do NOT rewrite the whole file — targeted edits only.
 
+### Step 8.5: Optionally comment session summary on tracked JIRA tickets
+
+Skip if `tickets:` from the session log is empty.
+
+Otherwise, ask via AskUserQuestion (single-select):
+
+- Question: `Comment session summary on the <N> tracked ticket(s)?`
+- Options:
+  - `No — skip` (recommended; default to this)
+  - `Yes — comment on all <N>`
+  - `Pick which ones`
+
+#### "No — skip"
+Continue to Step 9.
+
+#### "Yes — comment on all"
+For each `<KEY>` in `tickets:`, build a per-ticket comment by extracting from the session log:
+- The ticket's row from `## Tickets touched` (one-line outcome)
+- Any bullets from `## Decisions made`, `## Solutions & fixes`, `## Files modified` that reference this ticket or its scope
+- A backlink to the session log path
+
+Comment shape (≤500 chars per ticket; trim if longer):
+```
+Session summary (YYYY-MM-DD):
+- Outcome: <one-liner>
+- Key changes: <2–3 bullets>
+- Session log: <repo>/wiki/projects/<slug>/sessions/<file>.md
+```
+
+Push via `mcp__claude_ai_Atlassian__addCommentToJiraIssue` (uses `cloudId` from `brain.config.yaml` already in working memory). On per-ticket failure, don't abort — log the error and move to the next.
+
+#### "Pick which ones"
+Re-prompt via AskUserQuestion (multi-select) listing each `<KEY>` with its one-line outcome. Comment only on the selected subset.
+
+After commenting, append to the session log's `## Tickets touched` section: `(commented YYYY-MM-DD HH:MM)` next to each ticket that was successfully updated.
+
 ### Step 9: Confirm
 
 ```
@@ -209,6 +253,8 @@ SAVED.
 
 Session log:  wiki/projects/<primary>/sessions/YYYY-MM-DD-HHMM-<slug>.md
               (or "skipped — no project tagged")
+Tickets touched: <count from tickets: array>
+Comments pushed: <count>   (only if Step 8.5 ran)
 Review entries appended: <count> (to wiki/reviews/<review.current_period>.md)
                         (or "skipped — review file not initialized; run /brain:log-review first")
 Project state updated: <list of project files touched, or "none">
