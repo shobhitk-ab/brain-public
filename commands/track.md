@@ -222,8 +222,23 @@ Use AskUserQuestion (single-select):
        Epic:     <epic key>  (or "no epic")
        Assignee: me
      ```
-6. Call `mcp__claude_ai_Atlassian__createJiraIssue` with the resolved fields. Default `issuetype: Task` unless the description clearly indicates a bug (`fix`, `bug`, `broken`, `error`, `issue`) — in which case use `Bug`.
-7. Capture the new ticket key.
+6. **Build the JIRA `description` body** by appending a brain-tracked footer to the user's description so the JIRA ticket itself anchors back to the session:
+
+   ```
+   <user's description / synthesis>
+
+   ---
+   Tracked via /brain:track on YYYY-MM-DD
+   Project: <project_slug>
+   Claude Code session: <SESSION_ID or "none">
+   Resume: claude --resume <SESSION_ID>          (omit this line if SESSION_ID is null)
+   Session log: <STUB_PATH from Step 5>          (omit if STUB_PATH is null)
+   ```
+
+   The footer is written **once** at ticket creation. It's plain text — no JIRA wiki markup — so it renders cleanly across the JIRA UI, Slack previews, and the MCP. Anyone opening the ticket in JIRA can now see which session started it without needing the brain.
+
+7. Call `mcp__claude_ai_Atlassian__createJiraIssue` with the resolved fields, passing the description body built in step 6. Default `issuetype: Task` unless the description clearly indicates a bug (`fix`, `bug`, `broken`, `error`, `issue`) — in which case use `Bug`.
+8. Capture the new ticket key.
 
 #### (l) Link existing
 
